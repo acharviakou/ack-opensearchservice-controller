@@ -16,6 +16,7 @@ package domain
 import (
 	"context"
 	"errors"
+
 	"github.com/aws-controllers-k8s/opensearchservice-controller/apis/v1alpha1"
 	ackv1alpha1 "github.com/aws-controllers-k8s/runtime/apis/core/v1alpha1"
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
@@ -179,6 +180,7 @@ func (rm *resourceManager) customUpdateDomain(ctx context.Context, desired, late
 		}
 		ko.Spec.AutoTuneOptions = &v1alpha1.AutoTuneOptionsInput{
 			DesiredState:         resp.DomainConfig.AutoTuneOptions.Options.DesiredState,
+			UseOffPeakWindow:     resp.DomainConfig.AutoTuneOptions.Options.UseOffPeakWindow,
 			MaintenanceSchedules: maintSchedules,
 		}
 	} else {
@@ -198,17 +200,18 @@ func (rm *resourceManager) customUpdateDomain(ctx context.Context, desired, late
 			}
 		}
 		ko.Spec.ClusterConfig = &v1alpha1.ClusterConfig{
-			ColdStorageOptions:     csOptions,
-			DedicatedMasterCount:   resp.DomainConfig.ClusterConfig.Options.DedicatedMasterCount,
-			DedicatedMasterEnabled: resp.DomainConfig.ClusterConfig.Options.DedicatedMasterEnabled,
-			DedicatedMasterType:    resp.DomainConfig.ClusterConfig.Options.DedicatedMasterType,
-			InstanceCount:          resp.DomainConfig.ClusterConfig.Options.InstanceCount,
-			InstanceType:           resp.DomainConfig.ClusterConfig.Options.InstanceType,
-			WarmCount:              resp.DomainConfig.ClusterConfig.Options.WarmCount,
-			WarmEnabled:            resp.DomainConfig.ClusterConfig.Options.WarmEnabled,
-			WarmType:               resp.DomainConfig.ClusterConfig.Options.WarmType,
-			ZoneAwarenessConfig:    zaConfig,
-			ZoneAwarenessEnabled:   resp.DomainConfig.ClusterConfig.Options.ZoneAwarenessEnabled,
+			ColdStorageOptions:        csOptions,
+			DedicatedMasterCount:      resp.DomainConfig.ClusterConfig.Options.DedicatedMasterCount,
+			DedicatedMasterEnabled:    resp.DomainConfig.ClusterConfig.Options.DedicatedMasterEnabled,
+			DedicatedMasterType:       resp.DomainConfig.ClusterConfig.Options.DedicatedMasterType,
+			InstanceCount:             resp.DomainConfig.ClusterConfig.Options.InstanceCount,
+			InstanceType:              resp.DomainConfig.ClusterConfig.Options.InstanceType,
+			WarmCount:                 resp.DomainConfig.ClusterConfig.Options.WarmCount,
+			WarmEnabled:               resp.DomainConfig.ClusterConfig.Options.WarmEnabled,
+			WarmType:                  resp.DomainConfig.ClusterConfig.Options.WarmType,
+			ZoneAwarenessConfig:       zaConfig,
+			ZoneAwarenessEnabled:      resp.DomainConfig.ClusterConfig.Options.ZoneAwarenessEnabled,
+			MultiAZWithStandbyEnabled: resp.DomainConfig.ClusterConfig.Options.MultiAZWithStandbyEnabled,
 		}
 	} else {
 		ko.Spec.ClusterConfig = nil
@@ -257,6 +260,11 @@ func (rm *resourceManager) customUpdateDomain(ctx context.Context, desired, late
 		ko.Spec.EngineVersion = resp.DomainConfig.EngineVersion.Options
 	} else {
 		ko.Spec.EngineVersion = nil
+	}
+	if resp.DomainConfig.IPAddressType != nil {
+		ko.Spec.IPAddressType = resp.DomainConfig.IPAddressType.Options
+	} else {
+		ko.Spec.IPAddressType = nil
 	}
 	if resp.DomainConfig.NodeToNodeEncryptionOptions != nil {
 		ko.Spec.NodeToNodeEncryptionOptions = &v1alpha1.NodeToNodeEncryptionOptions{
@@ -370,6 +378,9 @@ func (rm *resourceManager) newCustomUpdateRequestPayload(
 		if desired.ko.Spec.AutoTuneOptions.DesiredState != nil {
 			f3.SetDesiredState(*desired.ko.Spec.AutoTuneOptions.DesiredState)
 		}
+		if desired.ko.Spec.AutoTuneOptions.UseOffPeakWindow != nil {
+			f3.SetUseOffPeakWindow(*desired.ko.Spec.AutoTuneOptions.UseOffPeakWindow)
+		}
 		if desired.ko.Spec.AutoTuneOptions.MaintenanceSchedules != nil {
 			f3f1 := []*svcsdk.AutoTuneMaintenanceSchedule{}
 			for _, f3f1iter := range desired.ko.Spec.AutoTuneOptions.MaintenanceSchedules {
@@ -439,6 +450,9 @@ func (rm *resourceManager) newCustomUpdateRequestPayload(
 		}
 		if desired.ko.Spec.ClusterConfig.ZoneAwarenessEnabled != nil {
 			f4.SetZoneAwarenessEnabled(*desired.ko.Spec.ClusterConfig.ZoneAwarenessEnabled)
+		}
+		if desired.ko.Spec.ClusterConfig.MultiAZWithStandbyEnabled != nil {
+			f4.SetMultiAZWithStandbyEnabled(*desired.ko.Spec.ClusterConfig.MultiAZWithStandbyEnabled)
 		}
 		res.SetClusterConfig(f4)
 	}
@@ -555,6 +569,10 @@ func (rm *resourceManager) newCustomUpdateRequestPayload(
 			f14.SetSubnetIds(f14f1)
 		}
 		res.SetVPCOptions(f14)
+	}
+
+	if desired.ko.Spec.IPAddressType != nil && delta.DifferentAt("Spec.IPAddressType") {
+		res.SetIPAddressType(*desired.ko.Spec.IPAddressType)
 	}
 
 	return res, nil
